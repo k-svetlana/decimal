@@ -4,16 +4,17 @@
 #include <stdio.h>
 
 int main() {
+  s21_decimal a = {{35}};
+  s21_decimal b = {{35}};
   s21_decimal decimal;
-  decimal.bits[0] = 0xFFFF;
+  decimal.bits[0] = 35;
   decimal.bits[1] = 2;
   decimal.bits[2] = 0;
-  decimal.bits[3] = 0b10000000000001010000000000000000;
+  decimal.bits[3] = 0b10000000000101010000000000000000;
   // printf("%d\n", getBit(decimal, 3));
   // printf("%d\n", getSign(decimal));
   printf("%d\n", power(decimal));
-  printf("%d\n", s21_get_scale(&decimal));
-  printf("%d\n", power_etsy(decimal));
+  printf("%d\n", s21_is_equal(&a, &b));
   return 0;
 }
 
@@ -28,8 +29,8 @@ int s21_from_int_to_decimal(int src, s21_decimal *dst) {
     return ERROR;
   }
 
-  *dst = s21_decimal_null();  // set to NULL
-  int sign;
+  *dst = s21_decimal_zero();  // set to NULL
+  int sign = POSITIVE;
 
   if (src < 0) {
     sign = NEGATIVE;
@@ -39,8 +40,6 @@ int s21_from_int_to_decimal(int src, s21_decimal *dst) {
       // because 2147483648 exceeds int's max (2147483647)
       src = -src;
     }
-  } else {
-    sign = POSITIVE;
   }
 
   dst->bits[0] = src;
@@ -64,7 +63,7 @@ int s21_from_int_to_decimal(int src, s21_decimal *dst) {
 //     }
 // }
 
-s21_decimal s21_decimal_null(void) {  // set the whole decimal to null
+s21_decimal s21_decimal_zero(void) {  // set the whole decimal to null
   s21_decimal res = {0};              // Initialize all bits to null
   return res;
 }
@@ -74,28 +73,70 @@ s21_decimal s21_decimal_null(void) {  // set the whole decimal to null
 
 // }
 
-
-// почему первая из этих трех функций видит только первую единицу?
 int power(s21_decimal decimal) {
-  int scale = 0;
-  int num = 0;
-  for (int i = 17; i < 25; i++) {
-    num += pow(((decimal.bits[3] >> i) & 1), 2);
-  }
-  return scale;
+    int res = 0;
+    for (int i = 0; i < 8; i++) {
+        if ((decimal.bits[3] >> (i+16)) & 1) {
+            res += pow(2, i);
+        }
+    }
+    return res;
 }
 
-int s21_get_scale(s21_decimal *value) {
-  int mask = 0b11111111;
-  return (mask << 16 & value->bits[3]) >> 16;
+int s21_is_equal(s21_decimal *leftOp, s21_decimal *rightOp) {
+    int isEqual = TRUE;
+
+    if (!leftOp || !rightOp) {
+        isEqual = FALSE;
+    }
+
+    if (isEqual && getSign(*leftOp) != getSign(*rightOp)) {
+        isEqual = FALSE;
+    }
+
+    if (isEqual) {
+        s21_normalize(leftOp, rightOp);
+    }
+
+    if (isEqual && power(*leftOp) != power(*rightOp)) {
+        isEqual = FALSE;
+    }
+
+    for (int i = 0; i < 3 && isEqual; i++) {  
+        if (leftOp->bits[i] != rightOp->bits[i]) {
+            isEqual = FALSE;
+        }
+    }
+
+    return isEqual;
 }
 
-int power_etsy(s21_decimal value) {
-  int res = 0;
-  int power = 1;
-  for (int i = 0; i < 8; i++){
-    res += ((value.bits[3] >> (i+16)) & 1)*power;
-    power *= 2;
+void s21_normalize(s21_decimal *left, s21_decimal *right) {
+  while (power(*left) > power(*right)) {
+      divten(right);
   }
-  return res;
+  while (power(*right) > power(*left)) {
+      divten(left);
+  }
+}
+
+int divten(s21_decimal *value) {
+  int ret = 0;
+  s21_BIG_decimal temp = {{0, 0, 0, 0, 0}};
+  unsigned remainder = 0;
+
+  for (int i = 95; i >= 0; i--) {
+    remainder <<= 1;
+    remainder |= getBit(*value, i);
+    if (remainder >= 10) {
+      remainder -= 10;
+      temp.bits[i/32] |= (1 << i%32);
+    }
+  }
+  if (temp.bits[3] == 0){
+    for (int i = 0; i < 4; i++){
+      value->bits[i] = temp.bits[i];
+    }
+  }
+  return ret;
 }

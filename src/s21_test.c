@@ -24,3 +24,27 @@ START_TEST(s21_from_int_to_decimal_test) {
   ck_assert_int_eq(0, result3.bits[3]);
 }
 END_TEST
+
+Suite *root_suite(void) {
+  Suite *s = suite_create("decimal");
+
+  TCase *tc_int_to_dec = tcase_create("int_to_dec");
+
+  tcase_add_test(tc_int_to_dec, s21_from_int_to_decimal_test);
+  
+  suite_add_tcase(s, tc_int_to_dec);
+
+  return s;
+}
+
+int main(void) {
+  int failed = 0;
+  Suite *s = root_suite();
+  SRunner *runner = srunner_create(s);
+
+  srunner_run_all(runner, CK_NORMAL);
+  failed = srunner_ntests_failed(runner);
+  srunner_free(runner);
+
+  return (failed == 0) ? 0 : -1;
+}
