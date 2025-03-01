@@ -36,5 +36,7 @@ s21_decimal s21_decimal_zero(void);
 int s21_is_equal(s21_decimal *leftOp, s21_decimal *rightOp);
 int divten(s21_decimal *value);
 void s21_normalize(s21_decimal *left, s21_decimal *right);
+int s21_truncate(s21_decimal value, s21_decimal *result);
+int changing_power(s21_decimal* value, int new_index);
 
 #endif  // S21_DECIMAL_H
