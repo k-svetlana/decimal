@@ -31,12 +31,16 @@ int getSign(s21_decimal decimal);
 s21_decimal s21_decimal_null(void);
 int s21_from_int_to_decimal(int src, s21_decimal *dst);
 // int s21_from_decimal_to_int(s21_decimal src, int *dst);
-int power(s21_decimal value);
+int getPower(s21_decimal value);
 s21_decimal s21_decimal_zero(void);
 int s21_is_equal(s21_decimal *leftOp, s21_decimal *rightOp);
 int divten(s21_decimal *value);
-void s21_normalize(s21_decimal *left, s21_decimal *right);
+int s21_normalize(s21_decimal *value_1, s21_decimal *value_2);
 int s21_truncate(s21_decimal value, s21_decimal *result);
 int changing_power(s21_decimal* value, int new_index);
+int s21_from_decimal_to_float(s21_decimal src, float *dst);
+int get_BIG_bit(s21_BIG_decimal value, int index);
+int multiten(s21_BIG_decimal *value);
+int s21_print_two(s21_decimal value);
 
 #endif  // S21_DECIMAL_H

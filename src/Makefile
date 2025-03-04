@@ -16,7 +16,6 @@ all: s21_decimal
 s21_decimal:
 	gcc $(CFLAGS) -o s21_decimal.out s21_decimal.c && ./s21_decimal.out
 
-
 clang:
 	clang-format -i *.c *.h
 

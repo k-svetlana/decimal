@@ -5,48 +5,146 @@
 #include <limits.h>
 
 int main() {
-  s21_decimal a = {{35}};
-  s21_decimal b = {{35}};
+  // s21_decimal decimal = {{35}};
+  // s21_decimal b = {{-35}};
   s21_decimal decimal;
-  decimal.bits[0] = 1103;
+  decimal.bits[0] = 0b00000000000000000000000000000010;
   decimal.bits[1] = 0;
   decimal.bits[2] = 0;
-  decimal.bits[3] = 0b10000000000000010000000000000000;
-  // printf("%d\n", getBit(decimal, 3));
+  decimal.bits[3] = 0b00000000000000000000000000000000;
+  s21_decimal b;
+  b.bits[0] = 2;
+  b.bits[1] = 0;
+  b.bits[2] = 0;
+  b.bits[3] = 0b00000000000000000000000000000000;
   // printf("%d\n", getSign(decimal));
-  printf("%d\n", power(decimal));
-  printf("%d\n", s21_is_equal(&a, &b));
+  // printf("%d\n", getPower(decimal));
+  printf("%d\n", s21_is_equal(&decimal, &b));
+
+  //ПРОВЕРКА decimal_to_float
+  // float dst;
+  // s21_from_decimal_to_float(decimal, &dst);
+  // printf("%f\n", dst);
+
+  // s21_print_two(decimal);
+  // printf("\n");
+  // s21_decimal result;
+  // s21_truncate(decimal, &result);
+  // s21_print_two(result);
+
   return 0;
 }
 
-int getBit(s21_decimal decimal, int pos) {
-  return (decimal.bits[pos / 32] >> ((pos % 32) - 1)) & 1;
+int s21_truncate(s21_decimal value, s21_decimal *result) {
+  int truncate = OK;
+  if (!result) {
+    truncate = ERROR;
+  }
+  *result = value;
+  int scale = getPower(value);
+
+  for (int i = 0; i < scale; i++) {
+    divten(result);
+  }
+
+  changing_power(result, 0);
+  return truncate;
 }
 
-int getSign(s21_decimal decimal) { return getBit(decimal, 127); }
+// взято у etsy
+int s21_print_two(s21_decimal value) {
+  int ret = 0;
+  for (int k = 3; k >= 0; k--){
+    for (int i = 31; i >= 0; --i){
+      printf("%d", (value.bits[k] >> i) & 1);
+    }
+    printf("\n");
+  }
+  return ret;
+}
 
-int s21_from_int_to_decimal(int src, s21_decimal *dst) {
-  if (!dst) {  // check that dest address is valid to avoid segm fault
-    return ERROR;
+
+int s21_is_equal(s21_decimal *leftOp, s21_decimal *rightOp) {
+  int isEqual = TRUE;
+  
+  if (!leftOp || !rightOp) {
+    isEqual = FALSE;
   }
 
-  *dst = s21_decimal_zero();  // set to NULL
-  int sign = POSITIVE;
+  int leftIsZero = (leftOp->bits[0] == 0 && leftOp->bits[1] == 0 && leftOp->bits[2] == 0);
+  int rightIsZero = (rightOp->bits[0] == 0 && rightOp->bits[1] == 0 && rightOp->bits[2] == 0);
 
-  if (src < 0) {
-    sign = NEGATIVE;
-    if (src != INT_MIN) {
-      // except minimal int value to avoid overflow.
-      // -2147483648 has no positive equivalent
-      // because 2147483648 exceeds int's max (2147483647)
-      src = -src;
+  if (leftIsZero && rightIsZero) {
+    isEqual = TRUE;
+  } else if (getSign(*leftOp) != getSign(*rightOp)) {
+    isEqual = FALSE;
+  } else {
+    s21_normalize(leftOp, rightOp);
+    for (int bitsIndex = 0; bitsIndex < 4; bitsIndex++) {
+      if (leftOp->bits[bitsIndex] != rightOp->bits[bitsIndex]) {
+        isEqual = FALSE;
+      }
     }
   }
+  
+  return isEqual;
+}
 
-  dst->bits[0] = src;
-  dst->bits[3] |= sign << 31;
+int s21_from_decimal_to_float(s21_decimal src, float *dst) {
+  int success = OK;
 
-  return OK;
+  if (!dst) {
+    success = ERROR;
+  } else {
+    *dst = 0;
+    double tmp = 0.0;
+
+    for (int i = 0; i < 96; i++) {
+      if (getBit(src, i) != 0) {
+        tmp += pow(2.0, i);
+        // printf("%lf\n", tmp);
+      }
+    }
+    int scale = getPower(src);
+    tmp /= pow(10.0, scale);
+    *dst = (float)tmp;
+
+    if (getSign(src) == NEGATIVE) {
+      *dst *= -1;
+    }
+  }
+  return success;
+}
+
+int getBit(s21_decimal decimal, int index) {
+  return (decimal.bits[index / 32] >> index % 32) & 1;
+}
+
+int getSign(s21_decimal decimal) {
+  return getBit(decimal, 127);
+}
+
+int s21_from_int_to_decimal(int src, s21_decimal *dst) {
+  int success = OK;
+  
+  if (!dst) {  // check that dest address is valid to avoid segm fault
+    success = ERROR;
+  } else {
+    *dst = s21_decimal_zero();  // set to NULL
+    int sign = POSITIVE;
+    if (src < 0) {
+      sign = NEGATIVE;
+      if (src != INT_MIN) {
+        // except minimal int value to avoid overflow.
+        // -2147483648 has no positive equivalent
+        // because 2147483648 exceeds int's max (2147483647)
+        src = -src;
+      }
+    }
+    dst->bits[0] = src;
+    dst->bits[3] |= sign << 31;
+  }
+  return success;
 }
 
 // int s21_from_decimal_to_int(s21_decimal src, int *dst) {
@@ -69,21 +167,6 @@ s21_decimal s21_decimal_zero(void) {
   return res;
 }
 
-int s21_truncate(s21_decimal value, s21_decimal *result) {
-  int truncate = OK;
-  if (!result) {
-    truncate = ERROR;
-  }
-  *result = value;
-  int scale = power(value);
-
-  for (int i = 0; i < scale; i++) {
-    divten(result);
-  }
-  changing_power(result, 0);
-  return truncate;
-}
-
 //взято у etsy
 int changing_power(s21_decimal* value, int new_index){
   int ret = 0;
@@ -93,14 +176,7 @@ int changing_power(s21_decimal* value, int new_index){
   return ret;
 }
 
-// s21_decimal zeroPower(s21_decimal decimal) {
-//   int res;
-//   for (int i = 0; i < 8; i++) {
-//     res = (decimal.bits[3] >> (i+16)) & 0;
-//   }
-// }
-
-int power(s21_decimal decimal) {
+int getPower(s21_decimal decimal) {
     int res = 0;
     for (int i = 0; i < 8; i++) {
         if ((decimal.bits[3] >> (i+16)) & 1) {
@@ -110,41 +186,63 @@ int power(s21_decimal decimal) {
     return res;
 }
 
-int s21_is_equal(s21_decimal *leftOp, s21_decimal *rightOp) {
-    int isEqual = TRUE;
+// void s21_normalize(s21_decimal *left, s21_decimal *right) {
+//   while (getPower(*left) > getPower(*right)) {
+//       divten(right);
+//   }
+//   while (getPower(*right) > getPower(*left)) {
+//       divten(left);
+//   }
+// }
 
-    if (!leftOp || !rightOp) {
-        isEqual = FALSE;
+int s21_normalize(s21_decimal *value_1, s21_decimal *value_2){
+  int ret = 0;
+  int pow1 = getPower(*value_1);
+  int pow2 = getPower(*value_2);
+  s21_BIG_decimal temp = {{0, 0, 0, 0, 0}};
+  if (pow1 != pow2) {
+    int extrpow = pow1 < pow2 ? pow2 - pow1 : pow1 - pow2;
+    for (int i = 0; i < 3; i++){
+      temp.bits[i] = pow1 < pow2 ? value_1->bits[i]: value_2->bits[i];
     }
-
-    if (isEqual && getSign(*leftOp) != getSign(*rightOp)) {
-        isEqual = FALSE;
+    for (int i = 0; i < extrpow; i++){
+      if (multiten(&temp) == 1) {
+        ret = pow1 < pow2 ? 1: 2;
+        break;
+      }
     }
-
-    if (isEqual) {
-        s21_normalize(leftOp, rightOp);
+    if (ret == 0) {
+      for (int i = 0; i < 3; i++){
+        if(pow1 < pow2) value_1->bits[i] = temp.bits[i];
+        else value_2->bits[i] = temp.bits[i];
+      }
+      changing_power(pow1 < pow2 ? value_1: value_2, pow1 < pow2 ? pow2 : pow1);
     }
-
-    if (isEqual && power(*leftOp) != power(*rightOp)) {
-        isEqual = FALSE;
-    }
-
-    for (int i = 0; i < 3 && isEqual; i++) {  
-        if (leftOp->bits[i] != rightOp->bits[i]) {
-            isEqual = FALSE;
-        }
-    }
-
-    return isEqual;
+  }
+  return ret;
 }
 
-void s21_normalize(s21_decimal *left, s21_decimal *right) {
-  while (power(*left) > power(*right)) {
-      divten(right);
+int multiten(s21_BIG_decimal *value){
+  int ret = 0;
+  s21_BIG_decimal temp = {{0, 0, 0, 0, 0}};
+  int carry = 0;
+  for (int i = 0; i < 97; i++) {
+    int bit = get_BIG_bit(*value, i);
+    int res = (bit * 10) + carry;
+    temp.bits[i / 32] |= (res & 1) << (i % 32);
+    carry = res >> 1;
   }
-  while (power(*right) > power(*left)) {
-      divten(left);
+  if (temp.bits[3] == 0){
+    for (int i = 0; i < 4; i++){
+      value->bits[i] = temp.bits[i];
+    }
   }
+  else ret = 1;
+  return ret;
+}
+
+int get_BIG_bit(s21_BIG_decimal value, int index){
+  return (value.bits[index / 32] >> index % 32) & 1;
 }
 
 //взято у etsy
@@ -168,3 +266,4 @@ int divten(s21_decimal *value) {
   }
   return ret;
 }
+
