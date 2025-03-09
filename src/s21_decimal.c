@@ -5,21 +5,23 @@
 #include <limits.h>
 
 int main() {
-  // s21_decimal decimal = {{35}};
-  // s21_decimal b = {{-35}};
   s21_decimal decimal;
-  decimal.bits[0] = 0b00000000000000000000000000000010;
-  decimal.bits[1] = 0;
+  decimal.bits[0] = 0b01110001111110110000100001000011;
+  decimal.bits[1] = 0b00000000000000000000000100011111;
   decimal.bits[2] = 0;
-  decimal.bits[3] = 0b00000000000000000000000000000000;
+  decimal.bits[3] = 0b10000000000000100000000000000000;
   s21_decimal b;
-  b.bits[0] = 2;
-  b.bits[1] = 0;
+  b.bits[0] = 0b01110001111110110000100001000011;
+  b.bits[1] = 0b00000000000000000000000100011111;
   b.bits[2] = 0;
-  b.bits[3] = 0b00000000000000000000000000000000;
+  b.bits[3] = 0b10000000000000100000000000000000;
   // printf("%d\n", getSign(decimal));
   // printf("%d\n", getPower(decimal));
   printf("%d\n", s21_is_equal(&decimal, &b));
+  printf("%d\n", s21_is_not_equal(&decimal, &b));
+
+  // s21_decimal decimal = {{35}};
+  // s21_decimal b = {{-35}};
 
   //ПРОВЕРКА decimal_to_float
   // float dst;
@@ -28,6 +30,8 @@ int main() {
 
   // s21_print_two(decimal);
   // printf("\n");
+  // // div_ten_signed(&decimal);
+  // // s21_print_two(decimal);
   // s21_decimal result;
   // s21_truncate(decimal, &result);
   // s21_print_two(result);
@@ -44,10 +48,10 @@ int s21_truncate(s21_decimal value, s21_decimal *result) {
   int scale = getPower(value);
 
   for (int i = 0; i < scale; i++) {
-    divten(result);
+    div_ten_signed(result);
   }
 
-  changing_power(result, 0);
+  result->bits[3] &= 0x80000000;
   return truncate;
 }
 
@@ -245,25 +249,21 @@ int get_BIG_bit(s21_BIG_decimal value, int index){
   return (value.bits[index / 32] >> index % 32) & 1;
 }
 
-//взято у etsy
-int divten(s21_decimal *value) {
-  int ret = 0;
+int div_ten_signed(s21_decimal *value) {
   s21_BIG_decimal temp = {{0, 0, 0, 0, 0}};
-  unsigned remainder = 0;
+  unsigned carry = 0;
 
   for (int i = 95; i >= 0; i--) {
-    remainder <<= 1;
-    remainder |= getBit(*value, i);
-    if (remainder >= 10) {
-      remainder -= 10;
-      temp.bits[i/32] |= (1 << i%32);
+    carry <<= 1;
+    carry |= getBit(*value, i);
+    if (carry >= 10) {
+      carry -= 10;
+      temp.bits[i/32] |= (1 << (i % 32));
     }
   }
-  if (temp.bits[3] == 0){
-    for (int i = 0; i < 4; i++){
-      value->bits[i] = temp.bits[i];
-    }
+  for (int i = 0; i < 3; i++) {
+    value->bits[i] = temp.bits[i];
   }
-  return ret;
+  return 0;
 }
 
