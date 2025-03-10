@@ -55,6 +55,15 @@ int s21_truncate(s21_decimal value, s21_decimal *result) {
   return truncate;
 }
 
+// use of hexadecimal mask 0xFF800000
+// Expanding 0xFF800000 to binary:
+// 1111 1111 1000 0000 0000 0000 0000 0000
+// Bits 31-24 (1111 1111 1) are kept as they are.
+// Bits 23-0 are cleared to zero.
+// E.g. both of these set exponent to zero:
+// result->bits[3] &= 0x80000000;
+// result->bits[3] &= ~(0x00FF0000);
+
 // взято у etsy
 int s21_print_two(s21_decimal value) {
   int ret = 0;
@@ -92,6 +101,10 @@ int s21_is_equal(s21_decimal *leftOp, s21_decimal *rightOp) {
   }
   
   return isEqual;
+}
+
+int s21_is_not_equal(s21_decimal *leftOp, s21_decimal *rightOp) {
+  return !s21_is_equal(leftOp, rightOp);
 }
 
 int s21_from_decimal_to_float(s21_decimal src, float *dst) {
@@ -267,3 +280,24 @@ int div_ten_signed(s21_decimal *value) {
   return 0;
 }
 
+int s21_floor(s21_decimal value, s21_decimal* result) {
+  *result = s21_decimal_zero();
+  s21_truncate(value, result);
+  if ((sign(value) == NEGATIVE && value.bits[3] & 0x00FF0000) != 0) {
+      s21_sub(*result, ((s21_decimal){{1, 0, 0, 0}}), result);
+  }
+  return 0;
+}
+
+int s21_round(s21_decimal value, s21_decimal* result) {
+  if ((value.bits[3] & 0x00FF0000) != 0) {
+    if (sign(value))
+      s21_sub(value, ((s21_decimal){{5, 0, 0, 65536}}), &value);
+    else
+      s21_add(value, ((s21_decimal){{5, 0, 0, 65536}}), &value);
+    s21_truncate(value, result);
+  } else {
+    *result = value;
+  }
+  return 0;
+}
