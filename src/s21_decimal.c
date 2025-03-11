@@ -43,15 +43,15 @@ int s21_truncate(s21_decimal value, s21_decimal *result) {
   int truncate = OK;
   if (!result) {
     truncate = ERROR;
+  } else {
+    *result = value;
+    int scale = getPower(value);
+  
+    for (int divCount = 0; divCount < scale; divCount++) {
+      div_ten_signed(result);
+    }
+    result->bits[3] &= 0x80000000;
   }
-  *result = value;
-  int scale = getPower(value);
-
-  for (int i = 0; i < scale; i++) {
-    div_ten_signed(result);
-  }
-
-  result->bits[3] &= 0x80000000;
   return truncate;
 }
 
@@ -263,12 +263,12 @@ int div_ten_signed(s21_decimal *value) {
   s21_BIG_decimal temp = {{0, 0, 0, 0, 0}};
   unsigned carry = 0;
 
-  for (int i = 95; i >= 0; i--) {
+  for (int bitIndex = 95; bitIndex >= 0; bitIndex--) {
     carry <<= 1;
-    carry |= getBit(*value, i);
+    carry |= getBit(*value, bitIndex);
     if (carry >= 10) {
       carry -= 10;
-      temp.bits[i/32] |= (1 << (i % 32));
+      temp.bits[bitIndex/32] |= (1 << (bitIndex % 32));
     }
   }
   for (int i = 0; i < 3; i++) {
