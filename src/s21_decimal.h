@@ -42,5 +42,8 @@ int s21_from_decimal_to_float(s21_decimal src, float *dst);
 int get_BIG_bit(s21_BIG_decimal value, int index);
 int multiten(s21_BIG_decimal *value);
 int s21_print_two(s21_decimal value);
+int s21_round(s21_decimal value, s21_decimal* result);
+int s21_floor(s21_decimal value, s21_decimal* result);
+
 
 #endif  // S21_DECIMAL_H

@@ -5,21 +5,23 @@
 #include <limits.h>
 
 int main() {
-  // s21_decimal decimal = {{35}};
-  // s21_decimal b = {{-35}};
   s21_decimal decimal;
-  decimal.bits[0] = 0b00000000000000000000000000000010;
-  decimal.bits[1] = 0;
+  decimal.bits[0] = 0b01110001111110110000100001000011;
+  decimal.bits[1] = 0b00000000000000000000000100011111;
   decimal.bits[2] = 0;
-  decimal.bits[3] = 0b00000000000000000000000000000000;
+  decimal.bits[3] = 0b10000000000000100000000000000000;
   s21_decimal b;
-  b.bits[0] = 2;
-  b.bits[1] = 0;
+  b.bits[0] = 0b01110001111110110000100001000011;
+  b.bits[1] = 0b00000000000000000000000100011111;
   b.bits[2] = 0;
-  b.bits[3] = 0b00000000000000000000000000000000;
+  b.bits[3] = 0b10000000000000100000000000000000;
   // printf("%d\n", getSign(decimal));
   // printf("%d\n", getPower(decimal));
   printf("%d\n", s21_is_equal(&decimal, &b));
+  printf("%d\n", s21_is_not_equal(&decimal, &b));
+
+  // s21_decimal decimal = {{35}};
+  // s21_decimal b = {{-35}};
 
   //ПРОВЕРКА decimal_to_float
   // float dst;
@@ -28,6 +30,8 @@ int main() {
 
   // s21_print_two(decimal);
   // printf("\n");
+  // // div_ten_signed(&decimal);
+  // // s21_print_two(decimal);
   // s21_decimal result;
   // s21_truncate(decimal, &result);
   // s21_print_two(result);
@@ -39,17 +43,26 @@ int s21_truncate(s21_decimal value, s21_decimal *result) {
   int truncate = OK;
   if (!result) {
     truncate = ERROR;
+  } else {
+    *result = value;
+    int scale = getPower(value);
+  
+    for (int divCount = 0; divCount < scale; divCount++) {
+      div_ten_signed(result);
+    }
+    result->bits[3] &= 0x80000000;
   }
-  *result = value;
-  int scale = getPower(value);
-
-  for (int i = 0; i < scale; i++) {
-    divten(result);
-  }
-
-  changing_power(result, 0);
   return truncate;
 }
+
+// use of hexadecimal mask 0xFF800000
+// Expanding 0xFF800000 to binary:
+// 1111 1111 1000 0000 0000 0000 0000 0000
+// Bits 31-24 (1111 1111 1) are kept as they are.
+// Bits 23-0 are cleared to zero.
+// E.g. both of these set exponent to zero:
+// result->bits[3] &= 0x80000000;
+// result->bits[3] &= ~(0x00FF0000);
 
 // взято у etsy
 int s21_print_two(s21_decimal value) {
@@ -69,25 +82,26 @@ int s21_is_equal(s21_decimal *leftOp, s21_decimal *rightOp) {
   
   if (!leftOp || !rightOp) {
     isEqual = FALSE;
-  }
-
-  int leftIsZero = (leftOp->bits[0] == 0 && leftOp->bits[1] == 0 && leftOp->bits[2] == 0);
-  int rightIsZero = (rightOp->bits[0] == 0 && rightOp->bits[1] == 0 && rightOp->bits[2] == 0);
-
-  if (leftIsZero && rightIsZero) {
-    isEqual = TRUE;
-  } else if (getSign(*leftOp) != getSign(*rightOp)) {
-    isEqual = FALSE;
   } else {
-    s21_normalize(leftOp, rightOp);
-    for (int bitsIndex = 0; bitsIndex < 4; bitsIndex++) {
-      if (leftOp->bits[bitsIndex] != rightOp->bits[bitsIndex]) {
-        isEqual = FALSE;
+    int leftIsZero = (leftOp->bits[0] == 0 && leftOp->bits[1] == 0 && leftOp->bits[2] == 0);
+    int rightIsZero = (rightOp->bits[0] == 0 && rightOp->bits[1] == 0 && rightOp->bits[2] == 0);
+
+    if (leftIsZero && rightIsZero) {
+      isEqual = TRUE;
+    } else {
+      s21_normalize(leftOp, rightOp);
+      for (int bitsIndex = 0; bitsIndex < 4; bitsIndex++) {
+        if (leftOp->bits[bitsIndex] != rightOp->bits[bitsIndex]) {
+          isEqual = FALSE;
+        }
       }
     }
   }
-  
   return isEqual;
+}
+
+int s21_is_not_equal(s21_decimal *leftOp, s21_decimal *rightOp) {
+  return !s21_is_equal(leftOp, rightOp);
 }
 
 int s21_from_decimal_to_float(s21_decimal src, float *dst) {
@@ -245,25 +259,42 @@ int get_BIG_bit(s21_BIG_decimal value, int index){
   return (value.bits[index / 32] >> index % 32) & 1;
 }
 
-//взято у etsy
-int divten(s21_decimal *value) {
-  int ret = 0;
+int div_ten_signed(s21_decimal *value) {
   s21_BIG_decimal temp = {{0, 0, 0, 0, 0}};
-  unsigned remainder = 0;
+  unsigned carry = 0;
 
-  for (int i = 95; i >= 0; i--) {
-    remainder <<= 1;
-    remainder |= getBit(*value, i);
-    if (remainder >= 10) {
-      remainder -= 10;
-      temp.bits[i/32] |= (1 << i%32);
+  for (int bitIndex = 95; bitIndex >= 0; bitIndex--) {
+    carry <<= 1;
+    carry |= getBit(*value, bitIndex);
+    if (carry >= 10) {
+      carry -= 10;
+      temp.bits[bitIndex/32] |= (1 << (bitIndex % 32));
     }
   }
-  if (temp.bits[3] == 0){
-    for (int i = 0; i < 4; i++){
-      value->bits[i] = temp.bits[i];
-    }
+  for (int i = 0; i < 3; i++) {
+    value->bits[i] = temp.bits[i];
   }
-  return ret;
+  return 0;
 }
 
+int s21_floor(s21_decimal value, s21_decimal* result) {
+  *result = s21_decimal_zero();
+  s21_truncate(value, result);
+  if ((sign(value) == NEGATIVE && value.bits[3] & 0x00FF0000) != 0) {
+      s21_sub(*result, ((s21_decimal){{1, 0, 0, 0}}), result);
+  }
+  return 0;
+}
+
+int s21_round(s21_decimal value, s21_decimal* result) {
+  if ((value.bits[3] & 0x00FF0000) != 0) {
+    if (sign(value))
+      s21_sub(value, ((s21_decimal){{5, 0, 0, 65536}}), &value);
+    else
+      s21_add(value, ((s21_decimal){{5, 0, 0, 65536}}), &value);
+    s21_truncate(value, result);
+  } else {
+    *result = value;
+  }
+  return 0;
+}
